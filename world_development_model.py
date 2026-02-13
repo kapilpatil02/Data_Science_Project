@@ -50,7 +50,7 @@ class WorldDevelopmentClusteringModel:
         self.random_state = random_state
         self.model = None 
         self.scaler = None                                                                
-        self.imputer = None
+        self.imputer_stats = None  # Store median values instead of imputer object to avoid pickle issues
         self.feature_names = None
         self.log_transform_cols = [
             'GDP', 'CO2 Emissions', 'Energy Usage',
@@ -121,29 +121,18 @@ class WorldDevelopmentClusteringModel:
         else:
             df_model = df_model[self.feature_names]
         
-        # Impute missing values
+        # Impute missing values using median (avoid pickle issues with SimpleImputer)
         if fit:
-            self.imputer = SimpleImputer(strategy='median')
-            df_model = pd.DataFrame(
-                self.imputer.fit_transform(df_model),
-                columns=df_model.columns
-            )
+            # Store median stats for later use instead of pickling imputer object
+            self.imputer_stats = df_model.median().to_dict()
+            df_model = df_model.fillna(self.imputer_stats)
         else:
-            try:
-                # Use saved imputer when possible
-                df_model = pd.DataFrame(
-                    self.imputer.transform(df_model),
-                    columns=df_model.columns
-                )
-            except Exception:
-                # Fallback: create and fit a new imputer on incoming data
-                fallback_imputer = SimpleImputer(strategy='median')
-                df_model = pd.DataFrame(
-                    fallback_imputer.fit_transform(df_model),
-                    columns=df_model.columns
-                )
-                # Replace the stored imputer to maintain consistency
-                self.imputer = fallback_imputer
+            # Use stored stats to fill missing values
+            if self.imputer_stats is not None:
+                df_model = df_model.fillna(self.imputer_stats)
+            else:
+                # Fallback: use median of incoming data
+                df_model = df_model.fillna(df_model.median())
         
         # Log transformation
         for col in self.log_transform_cols:
@@ -188,6 +177,7 @@ class WorldDevelopmentClusteringModel:
     def predict(self, df):
         """
         Predict cluster assignments for new data.
+        Handles missing columns by filling with 0.
         
         Parameters:
         -----------
@@ -201,8 +191,22 @@ class WorldDevelopmentClusteringModel:
         if self.model is None:
             raise ValueError("Model not trained! Call fit() first.")
         
-        X_scaled = self._preprocess(df, fit=False)
-        return self.model.predict(X_scaled)
+        try:
+            df_copy = df.copy()
+            # Add missing columns with 0 (safe filler for normalized data)
+            if self.feature_names:
+                for col in self.feature_names:
+                    if col not in df_copy.columns:
+                        df_copy[col] = 0
+                # Select only training features in correct order
+                df_copy = df_copy[self.feature_names]
+            
+            X_scaled = self._preprocess(df_copy, fit=False)
+            return self.model.predict(X_scaled)
+        except KeyError as e:
+            raise ValueError(f"Missing required feature(s): {e}")
+        except Exception as e:
+            raise ValueError(f"Prediction failed: {e}")
 
     def save(self, filepath='world_development_kmeans.pkl'):
         """
@@ -224,7 +228,7 @@ class WorldDevelopmentClusteringModel:
             pickle.dump({
                 'model': self.model,
                 'scaler': self.scaler,
-                'imputer': self.imputer,
+                'imputer_stats': self.imputer_stats,  # Store stats dict instead of imputer object
                 'feature_names': self.feature_names,
                 'log_transform_cols': self.log_transform_cols,
                 'currency_cols': self.currency_cols,
@@ -254,7 +258,7 @@ class WorldDevelopmentClusteringModel:
         instance = cls(n_clusters=data['metadata']['n_clusters'], random_state=42)
         instance.model = data['model']
         instance.scaler = data['scaler']
-        instance.imputer = data['imputer']
+        instance.imputer_stats = data.get('imputer_stats', {})  # Load stats dict (compatible with old pickles)
         instance.feature_names = data['feature_names']
         instance.log_transform_cols = data['log_transform_cols']
         instance.currency_cols = data['currency_cols']

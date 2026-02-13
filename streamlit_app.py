@@ -187,17 +187,40 @@ if mode == "Single Country":
         with col1:
             co2 = st.number_input("CO2 Emissions (metric tons)", 0, 10000000000, 500000)
             business_tax = st.slider("Business Tax Rate (%)", 0.0, 50.0, 25.0, 1.0)
+            ease_of_business = st.slider("Ease of Business (1-100)", 1.0, 100.0, 50.0, 1.0)
         with col2:
             energy = st.number_input("Energy Usage (kg oil equivalent)", 0, 10000, 2500)
             days_business = st.number_input("Days to Start Business", 0, 365, 7)
+            hours_tax = st.number_input("Hours to do Tax (annual)", 0, 1000, 200)
         with col3:
             tourism_in = st.number_input("Tourism Inbound (annual)", 0, 100000000, 10000000)
             tourism_out = st.number_input("Tourism Outbound (annual)", 0, 100000000, 8000000)
+            lending_interest = st.slider("Lending Interest Rate (%)", 0.0, 50.0, 5.0, 0.1)
+    
+    # Population breakdown
+    with st.expander("👥 Population Breakdown (Optional)"):
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            pop_0_14 = st.slider("Population 0-14 (%)", 0.0, 50.0, 20.0, 1.0)
+        with col2:
+            pop_15_64 = st.slider("Population 15-64 (%)", 30.0, 75.0, 65.0, 1.0)
+        with col3:
+            pop_65_plus = st.slider("Population 65+ (%)", 0.0, 50.0, 15.0, 1.0)
+        with col4:
+            pop_urban = st.slider("Population Urban (%)", 0.0, 100.0, 75.0, 1.0)
+    
+    # Health breakdown
+    with st.expander("💊 Health Metrics (Optional)"):
+        col1, col2 = st.columns(2)
+        with col1:
+            infant_mortality = st.number_input("Infant Mortality Rate (per 1000)", 0.0, 100.0, 10.0, 0.1)
+        with col2:
+            health_exp_pct_gdp = st.number_input("Health Exp as % of GDP", 0.0, 20.0, 5.0, 0.1)
     
     # Predict button
     st.divider()
     if st.button("🔮 Predict Development Cluster", key="predict_single", use_container_width=True, type="primary"):
-        # Prepare input data
+        # Prepare input data with all features
         input_data = pd.DataFrame({
             'Country': [country_name],
             'GDP': [gdp],
@@ -214,6 +237,15 @@ if mode == "Single Country":
             'Business Tax Rate': [business_tax],
             'Days to Start Business': [days_business],
             'Birth Rate': [birth_rate / 1000],  # Convert to decimal
+            'Ease of Business': [ease_of_business],
+            'Health Exp % GDP': [health_exp_pct_gdp],
+            'Hours to do Tax': [hours_tax],
+            'Infant Mortality Rate': [infant_mortality],
+            'Lending Interest': [lending_interest],
+            'Population 0-14': [pop_0_14 / 100],  # Convert to decimal
+            'Population 15-64': [pop_15_64 / 100],
+            'Population 65+': [pop_65_plus / 100],
+            'Population Urban': [pop_urban / 100],
         })
         
         # Make prediction
