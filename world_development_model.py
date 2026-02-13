@@ -129,10 +129,21 @@ class WorldDevelopmentClusteringModel:
                 columns=df_model.columns
             )
         else:
-            df_model = pd.DataFrame(
-                self.imputer.transform(df_model),
-                columns=df_model.columns
-            )
+            try:
+                # Use saved imputer when possible
+                df_model = pd.DataFrame(
+                    self.imputer.transform(df_model),
+                    columns=df_model.columns
+                )
+            except Exception:
+                # Fallback: create and fit a new imputer on incoming data
+                fallback_imputer = SimpleImputer(strategy='median')
+                df_model = pd.DataFrame(
+                    fallback_imputer.fit_transform(df_model),
+                    columns=df_model.columns
+                )
+                # Replace the stored imputer to maintain consistency
+                self.imputer = fallback_imputer
         
         # Log transformation
         for col in self.log_transform_cols:

@@ -495,6 +495,8 @@ elif mode == "Insights & Analytics":
         st.plotly_chart(fig_pca, use_container_width=True)
 
     st.subheader("Cluster Summaries")
+    preds = None
+    df_num_for_clusters = pd.DataFrame()
     try:
         with st.spinner("Computing cluster summaries..."):
             preds = model.predict(df_ins)
@@ -588,7 +590,7 @@ elif mode == "Insights & Analytics":
             st.info(f'Could not plot distribution for {feat}')
 
     st.subheader("Boxplot by Cluster")
-    if 'Cluster' in df_num_for_clusters.columns:
+    if not df_num_for_clusters.empty and 'Cluster' in df_num_for_clusters.columns:
         box_feat = st.selectbox('Feature for boxplot', options=[c for c in df_num_for_clusters.columns if c != 'Cluster'] , index=0)
         try:
             box_df = df_num_for_clusters.copy()
@@ -622,7 +624,7 @@ elif mode == "Insights & Analytics":
 
     st.subheader('Silhouette Score')
     try:
-        if len(set(preds)) > 1:
+        if preds is not None and len(set(preds)) > 1:
             imputer_global = SimpleImputer(strategy='median')
             X_full = imputer_global.fit_transform(num_df.dropna(axis=1, how='all'))
             scaler_global = StandardScaler()
@@ -630,7 +632,7 @@ elif mode == "Insights & Analytics":
             sil = silhouette_score(Xs_full, preds)
             st.metric('Silhouette Score', f'{sil:.4f}')
         else:
-            st.info('Silhouette not available — only one cluster present')
+            st.info('Silhouette not available — only one cluster present or predictions unavailable')
     except Exception:
         st.info('Silhouette could not be computed for the current dataset')
 
